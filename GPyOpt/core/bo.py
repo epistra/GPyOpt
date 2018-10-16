@@ -52,7 +52,7 @@ class BO(object):
         self.context = None
         self.num_acquisitions = 0
 
-    def suggest_next_locations(self, context = None, pending_X = None, ignored_X = None):
+    def suggest_next_locations(self, context = None, batch_context=None, pending_X = None, ignored_X = None):
         """
         Run a single optimization step and return the next locations to evaluate the objective.
         Number of suggested locations equals to batch_size.
@@ -64,13 +64,14 @@ class BO(object):
         self.model_parameters_iterations = None
         self.num_acquisitions = 0
         self.context = context
+        self.batch_context = batch_context
         self._update_model(self.normalization_type)
 
         suggested_locations = self._compute_next_evaluations(pending_zipped_X = pending_X, ignored_zipped_X = ignored_X)
 
         return suggested_locations
 
-    def run_optimization(self, max_iter = 0, max_time = np.inf,  eps = 1e-8, context = None, verbosity=False, save_models_parameters= True, report_file = None, evaluations_file = None, models_file=None):
+    def run_optimization(self, max_iter = 0, max_time = np.inf,  eps = 1e-8, context = None, batch_context=None, verbosity=False, save_models_parameters= True, report_file = None, evaluations_file = None, models_file=None):
         """
         Runs Bayesian Optimization for a number 'max_iter' of iterations (after the initial exploration data)
 
@@ -95,6 +96,7 @@ class BO(object):
         self.models_file = models_file
         self.model_parameters_iterations = None
         self.context = context
+        self.batch_context = batch_context
 
         # --- Check if we can save the model parameters in each iteration
         if self.save_models_parameters == True:
@@ -136,6 +138,7 @@ class BO(object):
             try:
                 self._update_model(self.normalization_type)
             except np.linalg.linalg.LinAlgError:
+                print("linAlgError")
                 break
 
             if (self.num_acquisitions >= self.max_iter
@@ -225,6 +228,10 @@ class BO(object):
 
         ## --- Update the context if any
         self.acquisition.optimizer.context_manager = ContextManager(self.space, self.context)
+        if self.batch_context:
+            batch_context_manager = [ContextManager(self.space, context) for context in self.batch_context]
+        else:
+            batch_context_manager = None
 
         ### --- Activate de_duplication
         if self.de_duplication:
@@ -233,7 +240,7 @@ class BO(object):
             duplicate_manager = None
 
         ### We zip the value in case there are categorical variables
-        return self.space.zip_inputs(self.evaluator.compute_batch(duplicate_manager=duplicate_manager, context_manager= self.acquisition.optimizer.context_manager))
+        return self.space.zip_inputs(self.evaluator.compute_batch(duplicate_manager=duplicate_manager, context_manager= self.acquisition.optimizer.context_manager, batch_context_manager=batch_context_manager))
 
     def _update_model(self, normalization_type='stats'):
         """

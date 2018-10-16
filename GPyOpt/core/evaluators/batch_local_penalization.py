@@ -19,16 +19,19 @@ class LocalPenalization(EvaluatorBase):
         self.acquisition = acquisition
         self.batch_size = batch_size
 
-    def compute_batch(self, duplicate_manager=None, context_manager=None):
+    def compute_batch(self, duplicate_manager=None, context_manager=None, batch_context_manager=None):
         """
         Computes the elements of the batch sequentially by penalizing the acquisition.
         """
         from ...acquisitions import AcquisitionLP
         assert isinstance(self.acquisition, AcquisitionLP)
+        assert not batch_context_manager or len(batch_context_manager) == self.batch_size
 
         self.acquisition.update_batches(None,None,None)
 
         # --- GET first element in the batch
+        if batch_context_manager:
+            self.acquisition.optimizer.context_manager = batch_context_manager[0]
         X_batch = self.acquisition.optimize()[0]
         k=1
 
@@ -40,6 +43,8 @@ class LocalPenalization(EvaluatorBase):
         # --- GET the remaining elements
         while k<self.batch_size:
             self.acquisition.update_batches(X_batch,L,Min)
+            if batch_context_manager:
+                self.acquisition.optimizer.context_manager = batch_context_manager[k]
             new_sample = self.acquisition.optimize()[0]
             X_batch = np.vstack((X_batch,new_sample))
             k +=1
