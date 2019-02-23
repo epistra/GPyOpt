@@ -15,7 +15,7 @@ class Sequential(EvaluatorBase):
     def __init__(self, acquisition, batch_size=1):
         super(Sequential, self).__init__(acquisition, batch_size)
 
-    def compute_batch(self, duplicate_manager=None,context_manager=None):
+    def compute_batch(self, duplicate_manager=None,context_manager=None, batch_context_manager=None):
         """
         Selects the new location to evaluate the objective.
         """

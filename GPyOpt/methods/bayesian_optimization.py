@@ -127,7 +127,7 @@ class BayesianOptimization(BO):
         if 'model' in self.kwargs:
             if isinstance(kwargs['model'], GPyOpt.models.base.BOModel):
                 self.model = kwargs['model']
-                self.model_type = 'User defined model used.'
+                #self.model_type = 'User defined model used.'
                 print('Using a model defined by the used.')
             else:
                 self.model = self._model_chooser()

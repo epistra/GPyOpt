@@ -14,7 +14,7 @@ class EvaluatorBase(object):
         self.acquisition = acquisition
         self.batch_size = batch_size
 
-    def compute_batch(self, duplicate_manager=None, context_manager=None):
+    def compute_batch(self, duplicate_manager=None, context_manager=None, batch_context_manager=None):
         raise NotImplementedError("Need to implement compute_batch.")
 
 
@@ -31,38 +31,39 @@ class SamplingBasedBatchEvaluator(EvaluatorBase):
         # The following number of anchor points is heuristically picked, to obtain good and various batches
         self.num_anchor = 5*batch_size
 
-    def initialize_batch(self, duplicate_manager=None, context_manager=None):
+    def initialize_batch(self, duplicate_manager=None, context_manager=None, batch_context_manager=None):
         raise NotImplementedError("Need to implement initialize_batch.")
 
-    def get_anchor_points(self, duplicate_manager=None, context_manager=None):
+    def get_anchor_points(self, duplicate_manager=None, context_manager=None, batch_context_manager=None):
         raise NotImplementedError("Need to implement get_anchor_points.")
 
-    def optimize_anchor_point(self, a, duplicate_manager=None, context_manager=None):
+    def optimize_anchor_point(self, a, duplicate_manager=None, context_manager=None, batch_context_manager=None):
         raise NotImplementedError("Need to implement optimize_anchor_point.")
 
-    def compute_batch_without_duplicate_logic(self,context_manager=None):
+    def compute_batch_without_duplicate_logic(self,context_manager=None, batch_context_manager=None):
         raise NotImplementedError("Need to implement compute_batch_without_duplicate_logic.")
 
-    def compute_batch(self, duplicate_manager=None, context_manager=None):
+    def compute_batch(self, duplicate_manager=None, context_manager=None, batch_context_manager=None):
 
         self.context_manager = context_manager
+        self.batch_context_manager = batch_context_manager
 
         # Easy case where we do not care about having duplicates suggested
         if not duplicate_manager:
-            return self.compute_batch_without_duplicate_logic(context_manager=self.context_manager)
+            return self.compute_batch_without_duplicate_logic(context_manager=self.context_manager, batch_context_manager=self.batch_context_manager)
 
         batch, already_suggested_points = [], duplicate_manager.unique_points.copy()
 
-        anchor_points = self.get_anchor_points(duplicate_manager=duplicate_manager, context_manager=self.context_manager)
+        anchor_points = self.get_anchor_points(duplicate_manager=duplicate_manager, context_manager=self.context_manager, batch_context_manager=self.batch_context_manager)
 
-        x0 = self.initialize_batch(duplicate_manager=duplicate_manager, context_manager = self.context_manager)
+        x0 = self.initialize_batch(duplicate_manager=duplicate_manager, context_manager = self.context_manager, batch_context_manager=self.batch_context_manager)
 
         if np.any(x0):
             batch.append(x0)
             already_suggested_points.add(self.zip_and_tuple(x0))
 
         for a in anchor_points:
-            x = self.optimize_anchor_point(a, duplicate_manager=duplicate_manager, context_manager = self.context_manager)
+            x = self.optimize_anchor_point(a, duplicate_manager=duplicate_manager, context_manager = self.context_manager, batch_context_manager=self.batch_context_manager)
 
             # We first try to add the optimized anchor point; if we cannot, we then try the initial anchor point.
             zipped_x = self.zip_and_tuple(x)
