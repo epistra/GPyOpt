@@ -14,10 +14,12 @@ class KMBBO(EvaluatorBase):
     :param batch size: the number of elements in the batch.
 
     """
-    def __init__(self, acquisition, batch_size):
+    def __init__(self, acquisition, batch_size, N_sample=200, N_rej=100):
         super(KMBBO, self).__init__(acquisition, batch_size)
         self.acquisition = acquisition
         self.batch_size = batch_size
+        self.N_sample = N_sample
+        self.N_rej = N_rej
 
     def compute_batch(self, duplicate_manager=None, context_manager=None, batch_context_manager=None):
         """
@@ -38,14 +40,13 @@ class KMBBO(EvaluatorBase):
         #print("acq_min:",acq_min)
         uniform_u = lambda high: np.random.uniform(low=acq_min, high=high, size=1)[0]
 
-        N_sample = 200
-        accepted_samples = np.empty((N_sample, 2))
+        accepted_samples = np.empty((self.N_sample, self.acquisition.space.dimensionality))
         accepted_samples[0] = s0
 
         # Batch Generarized Slice Sampling
         count=0
         #print("s0",s0)
-        for i in range(1,N_sample):
+        for i in range(1, self.N_sample):
             u = uniform_u(f(accepted_samples[i-1]))
             #print(i,"u:",u, "f(s):",f(accepted_samples[i-1]))
             while True:
@@ -58,9 +59,9 @@ class KMBBO(EvaluatorBase):
                     break
                 else:
                     count += 1
-                    if count > 100:
+                    if count > self.N_rej:
                         count = 0
-                        print("More than 100 samples are rejected successively")
+                        print("More than {} samples are rejected successively".format(self.N_rej))
                         accepted_samples[i] = s
                         break
 

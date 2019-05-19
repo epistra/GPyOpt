@@ -139,7 +139,7 @@ class BO(object):
                 self._update_model(self.normalization_type)
             except np.linalg.linalg.LinAlgError:
                 print("linAlgError")
-                break
+                raise
 
             if (self.num_acquisitions >= self.max_iter
                     or (len(self.X) > 1 and self._distance_last_evaluations() <= self.eps)):
