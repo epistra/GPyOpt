@@ -50,9 +50,11 @@ class BO(object):
         self.de_duplication = de_duplication
         self.model_parameters_iterations = None
         self.context = None
+        self.A_reduce = None
+        self.space_reduced = None
         self.num_acquisitions = 0
 
-    def suggest_next_locations(self, context = None, batch_context=None, pending_X = None, ignored_X = None):
+    def suggest_next_locations(self, context = None, batch_context=None, pending_X = None, ignored_X = None, A_reduce = None, space_reduced = None):
         """
         Run a single optimization step and return the next locations to evaluate the objective.
         Number of suggested locations equals to batch_size.
@@ -65,13 +67,15 @@ class BO(object):
         self.num_acquisitions = 0
         self.context = context
         self.batch_context = batch_context
+        self.A_reduce = A_reduce
+        self.space_reduced = space_reduced
         self._update_model(self.normalization_type)
 
         suggested_locations = self._compute_next_evaluations(pending_zipped_X = pending_X, ignored_zipped_X = ignored_X)
 
         return suggested_locations
 
-    def run_optimization(self, max_iter = 0, max_time = np.inf,  eps = 1e-8, context = None, batch_context=None, verbosity=False, save_models_parameters= True, report_file = None, evaluations_file = None, models_file=None):
+    def run_optimization(self, max_iter = 0, max_time = np.inf,  eps = 1e-8, context = None, batch_context=None, verbosity=False, save_models_parameters= True, report_file = None, evaluations_file = None, models_file=None, A_reduce = None, space_reduced = None):
         """
         Runs Bayesian Optimization for a number 'max_iter' of iterations (after the initial exploration data)
 
@@ -97,6 +101,8 @@ class BO(object):
         self.model_parameters_iterations = None
         self.context = context
         self.batch_context = batch_context
+        self.A_reduce = A_reduce
+        self.space_reduced = space_reduced
 
         # --- Check if we can save the model parameters in each iteration
         if self.save_models_parameters == True:
@@ -141,8 +147,8 @@ class BO(object):
                 print("linAlgError")
                 raise
 
-            if (self.num_acquisitions >= self.max_iter
-                    or (len(self.X) > 1 and self._distance_last_evaluations() <= self.eps)):
+            if (self.num_acquisitions >= self.max_iter):
+                #or (len(self.X) > 1 and self._distance_last_evaluations() <= self.eps)):
                 break
 
             self.suggested_sample = self._compute_next_evaluations()
@@ -227,9 +233,9 @@ class BO(object):
         """
 
         ## --- Update the context if any
-        self.acquisition.optimizer.context_manager = ContextManager(self.space, self.context)
+        self.acquisition.optimizer.context_manager = ContextManager(self.space, self.context, self.A_reduce, self.space_reduced)
         if self.batch_context:
-            batch_context_manager = [ContextManager(self.space, context) for context in self.batch_context]
+            batch_context_manager = [ContextManager(self.space, context, self.A_reduce, self.space_reduced) for context in self.batch_context]
         else:
             batch_context_manager = None
 

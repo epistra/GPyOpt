@@ -32,16 +32,16 @@ class AnchorPointsGenerator(object):
             add_context = lambda x: x
 
         ## --- Generate initial design
-        X = initial_design(self.design_type, space, self.num_samples)
+        X_reduced = initial_design(self.design_type, space, self.num_samples)
 
         if unique:
-            sorted_design = sorted(list({tuple(x) for x in X}))
-            X = space.unzip_inputs(np.vstack(sorted_design))
+            sorted_design = sorted(list({tuple(x) for x in X_reduced}))
+            X_reduced = space.unzip_inputs(np.vstack(sorted_design))
         else:
-            X = space.unzip_inputs(X)
+            X_reduced = space.unzip_inputs(X_reduced)
 
         ## --- Add context variables
-        X = add_context(X)
+        X = add_context(X_reduced)
 
         if duplicate_manager:
             is_duplicate = duplicate_manager.is_unzipped_x_duplicate
@@ -59,10 +59,11 @@ class AnchorPointsGenerator(object):
             print("Warning: expecting {} anchor points, only {} available.".format(num_anchor, len(non_duplicate_anchor_point_indexes)))
 
         X = X[non_duplicate_anchor_point_indexes,:]
+        X_reduced = X_reduced[non_duplicate_anchor_point_indexes,:]
 
         scores = self.get_anchor_point_scores(X)
 
-        anchor_points = X[np.argsort(scores)[:min(len(scores),num_anchor)], :]
+        anchor_points = X_reduced[np.argsort(scores)[:min(len(scores),num_anchor)], :]
 
         return anchor_points
 

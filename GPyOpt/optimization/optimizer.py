@@ -129,7 +129,7 @@ class OptCma(Optimizer):
 
 def apply_optimizer(optimizer, x0, f=None, df=None, f_df=None, duplicate_manager=None, context_manager=None, space=None):
     """
-    :param x0: initial point for a local optimizer (x0 can be defined with or without the context included).
+    :param x0: initial point for a local optimizer (x0 can be defined with or without the context included). If context or dimensionality reduction is enabled, this point lies in reduced space.
     :param f: function to optimize.
     :param df: gradient of the function to optimize.
     :param f_df: returns both the function to optimize and its gradient.
@@ -149,6 +149,8 @@ def apply_optimizer(optimizer, x0, f=None, df=None, f_df=None, duplicate_manager
     else:
         add_context = lambda x : x
 
+    x0_expanded = add_context(x0)
+
     if duplicate_manager and duplicate_manager.is_unzipped_x_duplicate(x0):
         raise ValueError("The starting point of the optimizer cannot be a duplicate.")
 
@@ -161,7 +163,7 @@ def apply_optimizer(optimizer, x0, f=None, df=None, f_df=None, duplicate_manager
 
     ## --- Run duplicate_manager
     if duplicate_manager and duplicate_manager.is_unzipped_x_duplicate(suggested_x_with_context_rounded):
-        suggested_x, suggested_fx = x0, np.atleast_2d(f(x0))
+        suggested_x, suggested_fx = x0_expanded, np.atleast_2d(f(x0_expanded))
     else:
         suggested_x, suggested_fx = suggested_x_with_context_rounded, f(suggested_x_with_context_rounded)
 
@@ -188,7 +190,7 @@ class OptimizationWithContext(object):
             self.f_df_nocontext = self.f_df
 
         else:
-            self.x0_nocontext = self.x0[:,self.context_manager.noncontext_index]
+            self.x0_nocontext = self.x0
             self.f_nocontext  = self.f_nc
             if self.f_df is None:
                 self.df_nocontext = None
@@ -216,8 +218,8 @@ class OptimizationWithContext(object):
         '''
         x = np.atleast_2d(x)
         xx = self.context_manager._expand_vector(x)
-        _, df_nocontext_xx = self.f_df(xx)
-        df_nocontext_xx = df_nocontext_xx[:,np.array(self.context_manager.noncontext_index)]
+        _, df_xx = self.f_df(xx)
+        df_nocontext_xx = self.context_manager._reduce_derivative(df_xx)
         return df_nocontext_xx
 
     def f_df_nc(self,x):
@@ -227,9 +229,9 @@ class OptimizationWithContext(object):
         '''
         x = np.atleast_2d(x)
         xx = self.context_manager._expand_vector(x)
-        f_nocontext_xx , df_nocontext_xx = self.f_df(xx)
-        df_nocontext_xx = df_nocontext_xx[:,np.array(self.context_manager.noncontext_index)]
-        return f_nocontext_xx, df_nocontext_xx
+        f_xx, df_xx = self.f_df(xx)
+        df_nocontext_xx = self.context_manager._reduce_derivative(df_xx)
+        return f_xx, df_nocontext_xx
 
 
 def choose_optimizer(optimizer_name, bounds):
