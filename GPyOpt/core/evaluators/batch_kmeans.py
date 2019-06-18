@@ -20,6 +20,7 @@ class KMBBO(EvaluatorBase):
         self.batch_size = batch_size
         self.N_sample = N_sample
         self.N_rej = N_rej
+        self.context_manager = acquisition.context_manager
 
     def compute_batch(self, duplicate_manager=None, context_manager=None, batch_context_manager=None):
         """
@@ -31,8 +32,18 @@ class KMBBO(EvaluatorBase):
             self.acquisition.optimizer.context_manager = batch_context_manager[0]
             raise NotImplementedError("batch_context is not supported")
 
-        f = lambda x: -self.acquisition.acquisition_function(x)[0,0]
-        uniform_x = lambda : samples_multidimensional_uniform(self.acquisition.space.get_bounds(), 1)[0,:]
+        if self.context_manager.A_reduce is None:
+            # not reduce dimension
+            f = lambda x: -self.acquisition.acquisition_function(x)[0,0]
+            uniform_x = lambda : samples_multidimensional_uniform(self.acquisition.space.get_bounds(), 1)[0,:]
+            dimension = self.acquisition.space.dimensionality
+        else:
+            # reduce dimension
+            f = lambda x: -self.acquisition.acquisition_function(self.context_manager._expand_vector(x))[0,0]
+            uniform_x = lambda : samples_multidimensional_uniform(self.context_manager.reduced_bounds, 1)[0,:]
+            dimension = self.context_manager.space_reduced.dimensionality
+
+        # first sample
         s0 = uniform_x()
 
         res = scipy.optimize.basinhopping(f, x0=s0, niter=100)
@@ -40,7 +51,7 @@ class KMBBO(EvaluatorBase):
         #print("acq_min:",acq_min)
         uniform_u = lambda high: np.random.uniform(low=acq_min, high=high, size=1)[0]
 
-        accepted_samples = np.empty((self.N_sample, self.acquisition.space.dimensionality))
+        accepted_samples = np.empty((self.N_sample, dimension))
         accepted_samples[0] = s0
 
         # Batch Generarized Slice Sampling
@@ -70,4 +81,3 @@ class KMBBO(EvaluatorBase):
         km.fit(accepted_samples)
 
         return km.cluster_centers_
-
