@@ -20,7 +20,7 @@ class KMBBO(EvaluatorBase):
         self.batch_size = batch_size
         self.N_sample = N_sample
         self.N_rej = N_rej
-        self.context_manager = acquisition.context_manager
+        self.context_manager = acquisition.optimizer.context_manager
 
     def compute_batch(self, duplicate_manager=None, context_manager=None, batch_context_manager=None):
         """
