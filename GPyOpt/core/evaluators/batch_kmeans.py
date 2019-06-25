@@ -1,6 +1,7 @@
 # written by Shuhei Horiguchi
 
 from .base import EvaluatorBase
+from ...util.general import samples_multidimensional_uniform
 import sampyl as smp
 from sampyl import np
 #import numpy as np
@@ -56,7 +57,7 @@ class KMBBO(EvaluatorBase):
         # Now sample from x ~ p(x) = max(f(x) - acq_min, 0)
         # using No-U-Turn Sampler
         logp = lambda x: np.log(np.clip(f(x) - acq_min), a_min=0, a_max=None)
-        start = smp.find_MAP(logp, {'x': np.ones(dimension)})
+        start = smp.find_MAP(logp, {'x': s0})
         nuts = smp.NUTS(logp, start)
         chain = nuts.sample(self.N_sample, burn=self.warmup)
 
