@@ -71,9 +71,10 @@ class KMBBO(EvaluatorBase):
             ))
             #print("lower_barrier:", lower_barrier)
             #print("upper_barrier:", upper_barrier)
-            #logp = np.log(np.clip(p, a_min=0, a_max=None))
+            #logp = np.log(np.clip(p+lower_barrier+upper_barrier, a_min=0, a_max=None))
+            logp = np.log(np.clip(p, a_min=0, a_max=None))
             #print("logp(", x, ") =", logp)
-            return p+lower_barrier+upper_barrier#logp
+            return logp#p+lower_barrier+upper_barrier
 
         def _dlogp(x, fmin):
             x_ = _expand(x)
@@ -83,14 +84,22 @@ class KMBBO(EvaluatorBase):
             if not is_valid(x_):
                 dp *= 0
             #print("dp", x, x_, ") =", dp)
-            lower_barrier = np.sum(1./np.clip(x_-np.array(context_manager.noncontext_bounds)[:,0], a_min=0, a_max=None))
-            upper_barrier = np.sum(1./np.clip(np.array(context_manager.noncontext_bounds)[:,1] - x_, a_min=0, a_max=None))
+            lower_barrier = np.sum(np.log(
+                np.clip(x_-np.array(context_manager.noncontext_bounds)[:,0], a_min=0, a_max=None)
+            ))
+            upper_barrier = np.sum(np.log(
+                np.clip(np.array(context_manager.noncontext_bounds)[:,1] - x_, a_min=0, a_max=None)
+            ))
+            dlower_barrier = np.sum(1./np.clip(x_-np.array(context_manager.noncontext_bounds)[:,0], a_min=0, a_max=None))
+            dupper_barrier = np.sum(1./np.clip(np.array(context_manager.noncontext_bounds)[:,1] - x_, a_min=0, a_max=None))
             #print("lower_barrier:", lower_barrier)
             #print("upper_barrier:", upper_barrier)
-            #logp = np.log(np.clip(p[0]-fmin, a_min=0, a_max=None))
-            #dlogp = dp / logp
+            #logp = np.log(np.clip(p[0]-fmin+lower_barrier+upper_barrier, a_min=0, a_max=None))
+            logp = np.log(np.clip(p[0]-fmin, a_min=0, a_max=None))
+            #dlogp = (dp+dlower_barrier+dupper_barrier) / logp
+            dlogp = (dp) / logp
             #print("dlogp(", x, ") =", dlogp)
-            return dp+lower_barrier+upper_barrier#dlogp
+            return dlogp#dp+lower_barrier+upper_barrier#dlogp
 
         # first sample
         s0 = uniform_x()
@@ -111,5 +120,7 @@ class KMBBO(EvaluatorBase):
         # K-Means
         km = KMeans(n_clusters=self.batch_size)
         km.fit(chain.x)
+        self.chain = chain
+        self.km = km
 
-        return expand(km.cluster_centers_)
+        return _expand(km.cluster_centers_)
