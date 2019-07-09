@@ -3,8 +3,7 @@
 from .base import EvaluatorBase
 from ...util.general import samples_multidimensional_uniform
 import sampyl as smp
-from sampyl import np
-#import numpy as np
+import numpy as np
 import scipy.optimize
 from sklearn.cluster import KMeans
 
@@ -16,12 +15,14 @@ class KMBBO(EvaluatorBase):
     :param batch size: the number of elements in the batch.
 
     """
-    def __init__(self, acquisition, batch_size, N_sample=200, warmup=100):
+    def __init__(self, acquisition, batch_size, N_sample=200, warmup=100, epsilon=1e-5, N_chain=1):
         super(KMBBO, self).__init__(acquisition, batch_size)
         self.acquisition = acquisition
         self.batch_size = batch_size
-        self.N_sample = N_sample
+        self.n_sample = N_sample
         self.warmup = warmup
+        self.epsilon = epsilon
+        self.n_chains = N_chain
 
     def compute_batch(self, duplicate_manager=None, context_manager=None, batch_context_manager=None):
         """
@@ -34,32 +35,78 @@ class KMBBO(EvaluatorBase):
 
         if not context_manager or context_manager.A_reduce is None:
             # not reduce dimension
-            expand = lambda x: x
+            _expand = lambda x: x
+            _reduce_d = lambda x: x
             f = lambda x: -self.acquisition.acquisition_function(x)[0,0]
             uniform_x = lambda : samples_multidimensional_uniform(self.acquisition.space.get_bounds(), 1)[0,:]
             dimension = self.acquisition.space.dimensionality
             print("not reduce: {} D".format(dimension))
         else:
             # reduce dimension
-            expand = lambda x: context_manager._expand_vector(x)
+            _expand = lambda x: context_manager._expand_vector(x)
+            _reduce_d = lambda x: context_manager._reduce_derivative(x)
             f = lambda x: -self.acquisition.acquisition_function(context_manager._expand_vector(x))[0,0]
             uniform_x = lambda : samples_multidimensional_uniform(context_manager.reduced_bounds, 1)[0,:]
             dimension = context_manager.space_reduced.dimensionality
             print("do reduce: {} D".format(dimension))
 
+        def is_valid(x):
+            #print(x)
+            #print(np.array(context_manager.noncontext_bounds))
+            lower = np.alltrue(x > np.array(context_manager.noncontext_bounds)[:,0])
+            upper = np.alltrue(x < np.array(context_manager.noncontext_bounds)[:,1])
+            return lower and upper
+
+        def _logp(x, fmin):
+            x_ = _expand(x)
+            p = -self.acquisition.acquisition_function(x_)[0,0]-fmin
+            if not is_valid(x_):
+                p = 0
+            #print("p(", x, x_, ") =", p)
+            lower_barrier = np.sum(np.log(
+                np.clip(x_-np.array(context_manager.noncontext_bounds)[:,0], a_min=0, a_max=None)
+            ))
+            upper_barrier = np.sum(np.log(
+                np.clip(np.array(context_manager.noncontext_bounds)[:,1] - x_, a_min=0, a_max=None)
+            ))
+            #print("lower_barrier:", lower_barrier)
+            #print("upper_barrier:", upper_barrier)
+            #logp = np.log(np.clip(p, a_min=0, a_max=None))
+            #print("logp(", x, ") =", logp)
+            return p+lower_barrier+upper_barrier#logp
+
+        def _dlogp(x, fmin):
+            x_ = _expand(x)
+            p,dp = self.acquisition.acquisition_function_withGradients(x_)
+            p = -p
+            dp = _reduce_d(-dp)[0]
+            if not is_valid(x_):
+                dp *= 0
+            #print("dp", x, x_, ") =", dp)
+            lower_barrier = np.sum(1./np.clip(x_-np.array(context_manager.noncontext_bounds)[:,0], a_min=0, a_max=None))
+            upper_barrier = np.sum(1./np.clip(np.array(context_manager.noncontext_bounds)[:,1] - x_, a_min=0, a_max=None))
+            #print("lower_barrier:", lower_barrier)
+            #print("upper_barrier:", upper_barrier)
+            #logp = np.log(np.clip(p[0]-fmin, a_min=0, a_max=None))
+            #dlogp = dp / logp
+            #print("dlogp(", x, ") =", dlogp)
+            return dp+lower_barrier+upper_barrier#dlogp
+
         # first sample
         s0 = uniform_x()
 
         res = scipy.optimize.basinhopping(f, x0=s0, niter=100)
-        acq_min = res.fun
-        #print("acq_min:",acq_min)
+        acq_min = res.fun - self.epsilon
+        print("acq_min:",acq_min)
 
         # Now sample from x ~ p(x) = max(f(x) - acq_min, 0)
         # using No-U-Turn Sampler
-        logp = lambda x: np.log(np.clip(f(x) - acq_min), a_min=0, a_max=None)
-        start = smp.find_MAP(logp, {'x': s0})
-        nuts = smp.NUTS(logp, start)
-        chain = nuts.sample(self.N_sample, burn=self.warmup)
+        logp = lambda x: _logp(x, acq_min)
+        dlogp = lambda x: _dlogp(x, acq_min)
+        start = smp.find_MAP(logp, {'x': s0}, grad_logp=dlogp)
+        print("start:",start)
+        nuts = smp.NUTS(logp, start, grad_logp=dlogp)
+        chain = nuts.sample(self.n_sample, burn=self.warmup, n_chains=self.n_chains)
 
         # K-Means
         km = KMeans(n_clusters=self.batch_size)
