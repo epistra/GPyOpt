@@ -7,6 +7,11 @@ import numpy as np
 import scipy.optimize
 from sklearn.cluster import KMeans
 
+list_sampler = [
+    "slice",
+    "nuts",
+]
+
 class KMBBO(EvaluatorBase):
     """
     Class for the batch method on 'Efficient and Scalable Batch Bayesian Optimization Using K-Means' (Groves et al., 2018).
@@ -15,14 +20,18 @@ class KMBBO(EvaluatorBase):
     :param batch size: the number of elements in the batch.
 
     """
-    def __init__(self, acquisition, batch_size, N_sample=200, warmup=100, epsilon=1e-5, N_chain=1):
+    def __init__(self, acquisition, batch_size, sampler="slice", N_sample=200, warmup=100, epsilon=1e-5, N_chain=1, max_resample=10):
         super(KMBBO, self).__init__(acquisition, batch_size)
         self.acquisition = acquisition
         self.batch_size = batch_size
+
+        assert sampler in list_sampler
+        self.sampler = sampler
         self.n_sample = N_sample
         self.warmup = warmup
         self.epsilon = epsilon
         self.n_chains = N_chain
+        self.max_resample = max_resample
 
     def compute_batch(self, duplicate_manager=None, context_manager=None, batch_context_manager=None):
         """
@@ -109,18 +118,35 @@ class KMBBO(EvaluatorBase):
         print("acq_min:",acq_min)
 
         # Now sample from x ~ p(x) = max(f(x) - acq_min, 0)
-        # using No-U-Turn Sampler
+        # using No-U-Turn Sampler or Slice Sampler
         logp = lambda x: _logp(x, acq_min)
         dlogp = lambda x: _dlogp(x, acq_min)
-        start = smp.find_MAP(logp, {'x': s0}, grad_logp=dlogp)
-        print("start:",start)
-        nuts = smp.NUTS(logp, start, grad_logp=dlogp)
-        chain = nuts.sample(self.n_sample, burn=self.warmup, n_chains=self.n_chains)
+        ok = False
+        count = 0
+        while not ok and count < self.max_resample:
+            try:
+                s0 = uniform_x()
+                start = smp.find_MAP(logp, {'x': s0}, grad_logp=dlogp)
+                #print("start:",start)
+                if self.sampler == "slice":
+                    s = smp.Slice(logp, start)#, grad_logp=dlogp)
+                elif self.sampler == "nuts":
+                    s = smp.NUTS(logp, start, grad_logp=dlogp)
+                chain = s.sample(self.n_sample, burn=self.warmup, n_chains=self.n_chains)
+                ok = True
+            except Exception as e:
+                print("Exception:", e.args)
+                ok = False
+                count += 1
+        if count == self.max_resample:
+            print("Maximum number of resample exceeded!")
+            self.samples = np.array([uniform_x() for i in range(self.n_sample)])
+        else:
+            self.samples = chain.x
 
         # K-Means
         km = KMeans(n_clusters=self.batch_size)
-        km.fit(chain.x)
-        self.chain = chain
+        km.fit(self.samples)
         self.km = km
 
         return _expand(km.cluster_centers_)
