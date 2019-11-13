@@ -20,7 +20,7 @@ class KMBBO(EvaluatorBase):
     :param batch size: the number of elements in the batch.
 
     """
-    def __init__(self, acquisition, batch_size, sampler="slice", N_sample=200, warmup=100, epsilon=1e-5, N_chain=1, max_resample=10):
+    def __init__(self, acquisition, batch_size, sampler="slice", N_sample=200, warmup=100, epsilon=1e-5, N_chain=1, max_resample=10, kmeans_after_expand=True, verbose=True):
         super(KMBBO, self).__init__(acquisition, batch_size)
         self.acquisition = acquisition
         self.batch_size = batch_size
@@ -32,6 +32,8 @@ class KMBBO(EvaluatorBase):
         self.epsilon = epsilon
         self.n_chains = N_chain
         self.max_resample = max_resample
+        self.kmeans_after_expand = kmeans_after_expand
+        self.verbose = verbose
 
     def compute_batch(self, duplicate_manager=None, context_manager=None, batch_context_manager=None):
         """
@@ -49,7 +51,7 @@ class KMBBO(EvaluatorBase):
             f = lambda x: -self.acquisition.acquisition_function(x)[0,0]
             uniform_x = lambda : samples_multidimensional_uniform(self.acquisition.space.get_bounds(), 1)[0,:]
             dimension = self.acquisition.space.dimensionality
-            print("not reduce: {} D".format(dimension))
+            #print("not reduce: {} D".format(dimension))
         else:
             # reduce dimension
             _expand = lambda x: context_manager._expand_vector(x)
@@ -57,7 +59,7 @@ class KMBBO(EvaluatorBase):
             f = lambda x: -self.acquisition.acquisition_function(context_manager._expand_vector(x))[0,0]
             uniform_x = lambda : samples_multidimensional_uniform(context_manager.reduced_bounds, 1)[0,:]
             dimension = context_manager.space_reduced.dimensionality
-            print("do reduce: {} D".format(dimension))
+            #print("do reduce: {} D".format(dimension))
 
         def is_valid(x):
             #print(x)
@@ -115,7 +117,7 @@ class KMBBO(EvaluatorBase):
 
         res = scipy.optimize.basinhopping(f, x0=s0, niter=100)
         acq_min = res.fun - self.epsilon
-        print("acq_min:",acq_min)
+        #print("acq_min:",acq_min)
 
         # Now sample from x ~ p(x) = max(f(x) - acq_min, 0)
         # using No-U-Turn Sampler or Slice Sampler
@@ -132,21 +134,28 @@ class KMBBO(EvaluatorBase):
                     s = smp.Slice(logp, start)#, grad_logp=dlogp)
                 elif self.sampler == "nuts":
                     s = smp.NUTS(logp, start, grad_logp=dlogp)
-                chain = s.sample(self.n_sample, burn=self.warmup, n_chains=self.n_chains)
+                chain = s.sample(self.n_sample, burn=self.warmup, n_chains=self.n_chains, progress_bar=self.verbose)
                 ok = True
             except Exception as e:
-                print("Exception:", e.args)
+                #print("Exception:", e.args)
                 ok = False
                 count += 1
         if count == self.max_resample:
-            print("Maximum number of resample exceeded!")
+            if self.verbose: print("Maximum number of resample exceeded!")
             self.samples = np.array([uniform_x() for i in range(self.n_sample)])
         else:
             self.samples = chain.x
 
         # K-Means
-        km = KMeans(n_clusters=self.batch_size)
-        km.fit(self.samples)
-        self.km = km
+        if self.kmeans_after_expand:
+            km = KMeans(n_clusters=self.batch_size)
+            km.fit(_expand(self.samples))
+            self.km = km
+            return km.cluster_centers_
 
-        return _expand(km.cluster_centers_)
+        else:
+            km = KMeans(n_clusters=self.batch_size)
+            km.fit(self.samples)
+            self.km = km
+
+            return _expand(km.cluster_centers_)
