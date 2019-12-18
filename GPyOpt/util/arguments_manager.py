@@ -3,7 +3,7 @@ from ..models.rfmodel import RFModel
 from ..models.warpedgpmodel import WarpedGPModel
 from ..models.input_warped_gpmodel import InputWarpedGPModel
 from ..core.evaluators import Sequential, RandomBatch, LocalPenalization, ThompsonBatch
-from ..acquisitions import AcquisitionEI, AcquisitionMPI, AcquisitionLCB, AcquisitionEI_MCMC, AcquisitionMPI_MCMC, AcquisitionLCB_MCMC, AcquisitionLP
+from ..acquisitions import AcquisitionEI, AcquisitionMPI, AcquisitionLCB, AcquisitionLCB_EST, AcquisitionEI_MCMC, AcquisitionMPI_MCMC, AcquisitionLCB_MCMC, AcquisitionLP
 from ..core.errors import InvalidConfigError
 
 class ArgumentsManager(object):
@@ -67,6 +67,9 @@ class ArgumentsManager(object):
 
         elif acquisition_type =='LCB':
             return AcquisitionLCB(model, space, acquisition_optimizer, None, acquisition_weight)
+
+        elif acquisition_type =='LCB_EST':
+            return AcquisitionLCB_EST(model, space, acquisition_optimizer, None, acquisition_weight)
 
         elif acquisition_type =='LCB_MCMC':
             return AcquisitionLCB_MCMC(model, space, acquisition_optimizer, None, acquisition_weight)

@@ -25,13 +25,16 @@ class forrester(function1d):
 	
 	:param sd: standard deviation, to generate noisy evaluations of the function.
 	'''
-	def __init__(self,sd=None):
+	def __init__(self,bounds=None,sd=None):
 		self.input_dim = 1		
 		if sd==None: self.sd = 0
 		else: self.sd=sd
 		self.min = 0.78 		## approx
-		self.fmin = -6 			## approx
-		self.bounds = [(0,1)]
+		self.fmin = -6 
+		if bounds is None:		## approx
+			self.bounds = [(0,1)]
+		else:
+    			self.bounds = bounds
 
 	def f(self,X):
 		X = X.reshape((len(X),1))

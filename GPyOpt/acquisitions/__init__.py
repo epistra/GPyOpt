@@ -7,9 +7,12 @@ from GPyOpt.acquisitions.EI_mcmc import AcquisitionEI_MCMC
 from .MPI import AcquisitionMPI
 from .MPI_mcmc import AcquisitionMPI_MCMC
 from .LCB import AcquisitionLCB
+from .LCB_EST import AcquisitionLCB_EST
 from .LCB_mcmc import AcquisitionLCB_MCMC
 from .LP import AcquisitionLP
 from .ES import AcquisitionEntropySearch
+
+from .EI_finite import AcquisitionEI_Finite
 
 def select_acquisition(name):
     '''
@@ -21,6 +24,8 @@ def select_acquisition(name):
         return AcquisitionEI_MCMC
     elif name == 'LCB':
         return AcquisitionLCB
+    elif name == 'LCB_EST':
+        return AcquisitionLCB_EST
     elif name == 'LCB_MCMC':
         return AcquisitionLCB_MCMC
     elif name == 'MPI':
@@ -31,5 +36,8 @@ def select_acquisition(name):
         return AcquisitionLP
     elif name == 'ES':
         return AcquisitionEntropySearch
+    elif name == "EI_finite":
+        return AcquisitionEI_Finite
+
     else:
         raise Exception('Invalid acquisition selected.')

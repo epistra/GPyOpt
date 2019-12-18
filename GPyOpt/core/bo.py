@@ -32,6 +32,7 @@ class BO(object):
     :param normalize_Y: whether to normalize the outputs before performing any optimization (default, True).
     :param model_update_interval: interval of collected observations after which the model is updated (default, 1).
     :param de_duplication: GPyOpt DuplicateManager class. Avoids re-evaluating the objective at previous, pending or infeasible locations (default, False).
+    :param time_cost: time func to evaluate a query.
     """
 
 
