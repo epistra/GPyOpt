@@ -13,6 +13,7 @@ mock>=2.0.0
 PyDOE >= 0.3.0
 sobol_seq >=0.1
 emcee==2.2.1
+sampyl-mcmc==0.3
 
 # For tests
 nose

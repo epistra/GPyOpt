@@ -20,24 +20,28 @@ class AnchorPointsGenerator(object):
 
         ## --- We use the context handler to remove duplicates only over the non-context variables
         if context_manager and not self.space._has_bandit():
-            space_configuration_without_context = [self.space.config_space_expanded[idx] for idx in context_manager.nocontext_index_obj]
-            space = Design_space(space_configuration_without_context, context_manager.space.constraints)
+            if context_manager.A_reduce is not None:
+                # if reducing dimension, constraints can not be applied
+                space = context_manager.space_reduced
+            else:
+                space_configuration_without_context = [self.space.config_space_expanded[idx] for idx in context_manager.nocontext_index_obj]
+                space = Design_space(space_configuration_without_context, context_manager.space.constraints)
             add_context = lambda x : context_manager._expand_vector(x)
         else:
             space = self.space
             add_context = lambda x: x
 
         ## --- Generate initial design
-        X = initial_design(self.design_type, space, self.num_samples)
+        X_reduced = initial_design(self.design_type, space, self.num_samples)
 
         if unique:
-            sorted_design = sorted(list({tuple(x) for x in X}))
-            X = space.unzip_inputs(np.vstack(sorted_design))
+            sorted_design = sorted(list({tuple(x) for x in X_reduced}))
+            X_reduced = space.unzip_inputs(np.vstack(sorted_design))
         else:
-            X = space.unzip_inputs(X)
+            X_reduced = space.unzip_inputs(X_reduced)
 
         ## --- Add context variables
-        X = add_context(X)
+        X = add_context(X_reduced)
 
         if duplicate_manager:
             is_duplicate = duplicate_manager.is_unzipped_x_duplicate
@@ -55,10 +59,11 @@ class AnchorPointsGenerator(object):
             print("Warning: expecting {} anchor points, only {} available.".format(num_anchor, len(non_duplicate_anchor_point_indexes)))
 
         X = X[non_duplicate_anchor_point_indexes,:]
+        X_reduced = X_reduced[non_duplicate_anchor_point_indexes,:]
 
         scores = self.get_anchor_point_scores(X)
 
-        anchor_points = X[np.argsort(scores)[:min(len(scores),num_anchor)], :]
+        anchor_points = X_reduced[np.argsort(scores)[:min(len(scores),num_anchor)], :]
 
         return anchor_points
 

@@ -38,7 +38,7 @@ class RandomBatch(SamplingBasedBatchEvaluator):
 
         return a
 
-    def compute_batch_without_duplicate_logic(self, context_manager=None):
+    def compute_batch_without_duplicate_logic(self, context_manager=None, batch_context_manager=None):
 
         x, anchor_points = self.initialize_batch(), self.get_anchor_points()
 

@@ -49,6 +49,6 @@ class ThompsonBatch(SamplingBasedBatchEvaluator):
         x, _ = apply_optimizer(self.local_optimizer, a, f=self.f, df=None, f_df=self.f_df, duplicate_manager=duplicate_manager, context_manager = self.context_manager, space=self.space)
         return self.space.round_optimum(x)
 
-    def compute_batch_without_duplicate_logic(self, context_manager=None):
+    def compute_batch_without_duplicate_logic(self, context_manager=None, batch_context_manager=None):
         anchor_points = self.get_anchor_points(context_manager=context_manager)
         return np.vstack([self.optimize_anchor_point(a, context_manager=context_manager) for a, _ in zip(anchor_points, range(self.batch_size))])

@@ -8,7 +8,7 @@ from pylab import savefig
 import pylab
 
 
-def plot_acquisition(bounds,input_dim,model,Xdata,Ydata,acquisition_function,suggested_sample, filename = None):
+def plot_acquisition(bounds,input_dim,model,Xdata,Ydata,acquisition_function,suggested_sample, filename = None, suggested_sample2 = None, suggested_sample3 = None, context_manager=None):
     '''
     Plots of the model and the acquisition function in 1D and 2D examples.
     '''
@@ -78,26 +78,45 @@ def plot_acquisition(bounds,input_dim,model,Xdata,Ydata,acquisition_function,sug
             plt.show()
 
     if input_dim ==2:
+        if not context_manager or context_manager.A_reduce is None:
+            pass
+        else:
+            bounds = context_manager.space_reduced.get_bounds()
         X1 = np.linspace(bounds[0][0], bounds[0][1], 200)
         X2 = np.linspace(bounds[1][0], bounds[1][1], 200)
         x1, x2 = np.meshgrid(X1, X2)
         X = np.hstack((x1.reshape(200*200,1),x2.reshape(200*200,1)))
+        if not context_manager or context_manager.A_reduce is None:
+            pass
+        else:
+            X = context_manager._expand_vector(X)
+
         acqu = acquisition_function(X)
         acqu_normalized = (-acqu - min(-acqu))/(max(-acqu - min(-acqu)))
         acqu_normalized = acqu_normalized.reshape((200,200))
         m, v = model.predict(X)
-        plt.figure(figsize=(15,5))
+        plt.figure(figsize=(15,4))
         plt.subplot(1, 3, 1)
         plt.contourf(X1, X2, m.reshape(200,200),100)
-        plt.plot(Xdata[:,0], Xdata[:,1], 'r.', markersize=10, label=u'Observations')
         plt.colorbar()
+        if not context_manager or context_manager.A_reduce is None:
+            plt.plot(Xdata[:,0], Xdata[:,1], 'r.', markersize=10, label=u'Observations')
+        if suggested_sample2 is not None:
+            plt.plot(suggested_sample2[:,0],suggested_sample2[:,1],'cyan', marker=".", markersize=3, alpha=0.6)
+        if suggested_sample3 is not None:
+            plt.plot(suggested_sample3[:,0],suggested_sample3[:,1],'orange', marker=".", markersize=3, alpha=0.6)
         plt.xlabel('X1')
         plt.ylabel('X2')
         plt.title('Posterior mean')
         plt.axis((bounds[0][0],bounds[0][1],bounds[1][0],bounds[1][1]))
         ##
         plt.subplot(1, 3, 2)
-        plt.plot(Xdata[:,0], Xdata[:,1], 'r.', markersize=10, label=u'Observations')
+        if not context_manager or context_manager.A_reduce is None:
+            plt.plot(Xdata[:,0], Xdata[:,1], 'r.', markersize=10, label=u'Observations')
+        if suggested_sample2 is not None:
+            plt.plot(suggested_sample2[:,0],suggested_sample2[:,1],'cyan', marker=".", markersize=3, alpha=0.6)
+        if suggested_sample3 is not None:
+            plt.plot(suggested_sample3[:,0],suggested_sample3[:,1],'orange', marker=".", markersize=3, alpha=0.6)
         plt.contourf(X1, X2, np.sqrt(v.reshape(200,200)),100)
         plt.colorbar()
         plt.xlabel('X1')
@@ -108,11 +127,17 @@ def plot_acquisition(bounds,input_dim,model,Xdata,Ydata,acquisition_function,sug
         plt.subplot(1, 3, 3)
         plt.contourf(X1, X2, acqu_normalized,100)
         plt.colorbar()
+        if suggested_sample2 is not None:
+            plt.plot(suggested_sample2[:,0],suggested_sample2[:,1],'cyan', marker=".", markersize=3, alpha=0.6)
+        if suggested_sample3 is not None:
+            plt.plot(suggested_sample3[:,0],suggested_sample3[:,1],'orange', marker=".", markersize=3, alpha=0.6)
+
         plt.plot(suggested_sample[:,0],suggested_sample[:,1],'k.', markersize=10)
         plt.xlabel('X1')
         plt.ylabel('X2')
         plt.title('Acquisition function')
         plt.axis((bounds[0][0],bounds[0][1],bounds[1][0],bounds[1][1]))
+        plt.tight_layout()
         if filename!=None:
             savefig(filename)
         else:
