@@ -7,6 +7,7 @@ from .batch_random import RandomBatch
 from .batch_local_penalization import LocalPenalization
 from .batch_thompson import ThompsonBatch
 from .batch_kmeans import KMBBO
+from .batch_dpp import DPP
 
 def select_evaluator(name):
     if name == 'sequential':
@@ -19,5 +20,7 @@ def select_evaluator(name):
         return ThompsonBatch
     elif name == 'kmeans':
         return KMBBO
+    elif name == 'dpp':
+        return DPP
     else:
         raise Exception('Invalid acquisition evaluator selected.')
